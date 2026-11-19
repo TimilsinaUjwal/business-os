@@ -114,7 +114,7 @@
     <div class="navlink" data-view="settings"><span class="ico">⚙</span> Settings</div>
     <div class="spacer"></div>
     <div style="padding:0 12px 8px"><span class="liveflag" id="liveflag">● loading…</span></div>
-    <div class="foot">Integration-agnostic · Free-first<br>No hardcoded business limit</div>
+    <div class="foot" id="sidefoot">Integration-agnostic · Free-first<br>No hardcoded business limit</div>
   </aside>
   <aside class="sidebar2" id="sidebar2"></aside>
   <main class="main" id="main"><div style="padding:60px;color:var(--muted)">Loading Business OS…</div></main>
@@ -168,15 +168,20 @@ const SECTIONS={
 };
 function kpisFor(view,bizId){
   const rx=SECTIONS[view].kpiRx;
-  return DB.kpiDefs.filter(k=>(bizId==='all'||String(relId(k.business_id))===String(bizId))&&(!rx||(rx.test(k.name)||rx.test(k.category||''))));
+  let ids=null;
+  if(bizId==='all'&&session&&session.role==='client')ids=session.bizIds.map(String);
+  return DB.kpiDefs.filter(k=>(bizId==='all'||String(relId(k.business_id))===String(bizId))&&(bizId!=='all'||!ids||ids.includes(String(relId(k.business_id))))&&(!rx||(rx.test(k.name)||rx.test(k.category||''))));
 }
 function bizAccounts(bizId){return DB.accounts.filter(a=>String(relId(a.business_id))===String(bizId));}
 function bizKpis(bizId){return DB.kpiDefs.filter(k=>String(relId(k.business_id))===String(bizId));}
 
-document.querySelectorAll('.navlink').forEach(n=>n.onclick=()=>{view=n.dataset.view;sub='all';tab='overview';document.querySelectorAll('.navlink').forEach(x=>x.classList.toggle('active',x===n));render();});
+document.querySelectorAll('.navlink').forEach(n=>n.onclick=()=>{if(n.style.display==='none')return;view=n.dataset.view;sub='all';tab='overview';
+  if(session&&session.role==='client'){if(view==='settings')return;if(view==='business')sub=session.bizIds[0];}
+  document.querySelectorAll('.navlink').forEach(x=>x.classList.toggle('active',x===n));render();});
 
 function renderS2(){
   const el=document.getElementById('sidebar2'); const s=SECTIONS[view];
+  const visibleBiz=(session&&session.role==='client')?DB.businesses.filter(b=>session.bizIds.includes(Number(b.id))||session.bizIds.includes(String(b.id))):DB.businesses;
   if(view==='settings'){
     el.innerHTML=`<div class="s2title">Settings</div>
       ${[['platform','Platform'],['providers','Provider Registry'],['users','Users & Access'],['modules','Modules Catalog']].map(([id,label])=>
@@ -185,16 +190,16 @@ function renderS2(){
   }
   if(view==='business'){
     el.innerHTML=`<div class="s2title">${s.title}</div>
-      <div class="s2link ${sub==='all'?'active':''}" onclick="sub='all';render()"><span>All Businesses</span><span class="cnt">${DB.businesses.length}</span></div>
-      ${DB.businesses.map(b=>{
+      ${(session&&session.role==='client')?'':`<div class="s2link ${sub==='all'?'active':''}" onclick="sub='all';render()"><span>All Businesses</span><span class="cnt">${DB.businesses.length}</span></div>`}
+      ${((session&&session.role==='client')?DB.businesses.filter(b=>session.bizIds.includes(Number(b.id))||session.bizIds.includes(String(b.id))):DB.businesses).map(b=>{
         const k=bizKpis(b.id).length, c=bizAccounts(b.id).filter(a=>a.status==='connected').length;
         return `<div class="s2link ${String(sub)===String(b.id)?'active':''}" onclick="sub=${b.id};tab='overview';render()"><span>${esc(b.name)}</span><span class="cnt">${k} KPI · ${c} int</span></div>`;}).join('')}
-      <div class="s2add" onclick="showAddBusiness()">+ Add Business</div>`;
+      ${(session&&session.role==='client')?'':'<div class="s2add" onclick="showAddBusiness()">+ Add Business</div>'}`;
     return;
   }
   el.innerHTML=`<div class="s2title">${s.title}</div>
     <div class="s2link ${sub==='all'?'active':''}" onclick="sub='all';render()"><span>All Businesses</span><span class="cnt">${kpisFor(view,'all').length} KPIs</span></div>
-    ${DB.businesses.map(b=>{
+    ${visibleBiz.map(b=>{
       const k=kpisFor(view,b.id).length;
       return `<div class="s2link ${String(sub)===String(b.id)?'active':''}" onclick="sub=${b.id};render()"><span>${esc(b.name)}</span><span class="cnt">${k?k+' KPI':''}&nbsp;</span></div>`;}).join('')}`;
 }
@@ -202,6 +207,10 @@ function renderS2(){
 function render(){
   renderS2();
   const el=document.getElementById('main');
+  if(session&&session.role==='client'){
+    if(view==='settings')return renderBusinessWorkspace(el,DB.businesses.find(b=>String(b.id)===String(session.bizIds[0])));
+    if(view==='business'&&sub==='all')sub=session.bizIds[0];
+  }
   if(view==='settings'){
     if(sub==='platform')return renderPlatform(el);
     if(sub==='providers')return renderProviders(el);
@@ -233,7 +242,7 @@ function renderPortfolio(el){
       <div class="stat"><div class="n">${DB.providers.length}</div><div class="l">Providers in registry</div></div>
     </div>
     <div class="grid">
-      ${DB.businesses.map(b=>{
+    ${visibleBiz.map(b=>{
         const n=bizAccounts(b.id).filter(a=>a.status==='connected').length;
         return `<div class="card" onclick="sub=${b.id};tab='overview';render()">
           <h3>${esc(b.name)}</h3><div class="ind">${esc(b.industry||'—')}</div>
@@ -534,6 +543,43 @@ async function saveGoogleClientId(){
 
 /* ---------- MODALS & WRITES ---------- */
 function modal(html){document.body.insertAdjacentHTML('beforeend',`<div class="modal-bg" onclick="if(event.target===this)this.remove()"><div class="modal">${html}</div></div>`);}
+
+/* ---------- LOGIN (client portal gate) ---------- */
+let session=null; try{session=JSON.parse(localStorage.getItem('bos_session')||'null')}catch(e){}
+function renderLogin(msg){
+  document.body.insertAdjacentHTML('beforeend',`<div id="login" style="position:fixed;inset:0;background:var(--navy);z-index:999;display:flex;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:14px;padding:34px 36px;width:360px;max-width:92vw">
+    <div style="font-size:22px;font-weight:800;color:var(--navy)">Business OS</div>
+    <div class="hint" style="margin:6px 0 18px">Sign in to your business dashboard.</div>
+    ${msg?`<div style="background:#FBE7E7;color:var(--red);border-radius:8px;padding:9px 12px;font-size:13px;margin-bottom:12px">${esc(msg)}</div>`:''}
+    <div class="field"><label>Your email</label><input id="lg-email" placeholder="you@company.com" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <div class="actions" style="justify-content:flex-start"><button class="btn" onclick="doLogin()">Sign in</button></div>
+  </div></div>`);
+}
+async function doLogin(){
+  const email=(document.getElementById('lg-email').value||'').trim().toLowerCase();
+  if(!email)return;
+  const u=DB.users.find(x=>(x.email||'').toLowerCase()===email);
+  if(!u){document.getElementById('login').remove();return renderLogin('No access found for '+email+'. Ask your account manager for an invite.');}
+  const acc=DB.access.filter(a=>String(relId(a.user_id))===String(u.id)).map(a=>Number(relId(a.business_id)));
+  const isStaff=u.role==='owner'||u.role==='admin';
+  session={userId:String(u.id),name:u.name,role:isStaff?'staff':'client',bizIds:isStaff?DB.businesses.map(b=>Number(b.id)):acc};
+  localStorage.setItem('bos_session',JSON.stringify(session));
+  document.getElementById('login').remove();applySession();
+}
+function doLogout(){localStorage.removeItem('bos_session');session=null;location.reload();}
+function applySession(){
+  const foot=document.getElementById('sidefoot');
+  if(session){
+    foot.innerHTML=`Sign in: <b>${esc(session.name)}</b> (${session.role})<br><span style="cursor:pointer;text-decoration:underline" onclick="doLogout()">Sign out</span>`;
+  }
+  if(session&&session.role==='client'){
+    document.querySelectorAll('.navlink').forEach(n=>{if(n.dataset.view==='settings')n.style.display='none';});
+    view='business';sub=session.bizIds[0]||'all';tab='overview';
+    document.querySelectorAll('.navlink').forEach(n=>n.classList.toggle('active',n.dataset.view==='business'));
+  }
+  render();
+}
 function showAddBusiness(){
   modal(`<h3>Add a new business</h3><div class="hint" style="margin-bottom:14px">Auto-provisioning: unique business ID, standard sidebar and modules, independent KPIs, own integrations, and inclusion in the portfolio dashboard. No code change required.</div>
   <div class="field"><label>Business name</label><input id="nb-name"></div>
@@ -630,7 +676,7 @@ async function submitKpiActual(kpiId){
   }catch(e){
     f.style.background='#FBE7E7'; f.style.color='var(--red)'; f.textContent='● Cannot reach database';
   }
-  render();
+  if(!session)renderLogin();else applySession();
 })();
 </script>
 </body>
