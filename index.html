@@ -124,11 +124,11 @@
 <script src="config.js"></script>
 <script>
 const sb = window.supabase.createClient(CONFIG.supabaseUrl, CONFIG.supabaseAnonKey);
-let DB = {businesses:[],providers:[],accounts:[],modules:[],bizmodules:[],kpiDefs:[],kpiActuals:[],users:[],access:[],metrics:[],steps:[]};
+let DB = {businesses:[],providers:[],accounts:[],modules:[],bizmodules:[],kpiDefs:[],kpiActuals:[],users:[],access:[],metrics:[],steps:[],settings:[]};
 let view='business', sub='all', tab='overview';
 
 async function loadAll(){
-  const [b,p,a,m,bm,kd,ka,u,ac,mt,st] = await Promise.all([
+  const [b,p,a,m,bm,kd,ka,u,ac,mt,st,as] = await Promise.all([
     sb.from('businesses').select('*').order('id'),
     sb.from('integration_providers').select('*').order('id'),
     sb.from('external_accounts').select('*').order('id'),
@@ -139,13 +139,17 @@ async function loadAll(){
     sb.from('users').select('*').order('id'),
     sb.from('user_business_access').select('*').order('id'),
     sb.from('provider_metrics').select('*').order('id'),
-    sb.from('onboarding_steps').select('*').order('id')
+    sb.from('onboarding_steps').select('*').order('id'),
+    sb.from('app_settings').select('*')
   ]);
-  if(b.error||p.error||a.error||m.error||bm.error||kd.error||ka.error||u.error||ac.error||mt.error||st.error){
-    const e=[b,p,a,m,bm,kd,ka,u,ac,mt,st].find(x=>x.error); throw new Error('db read failed: '+(e&&e.error?e.error.message:''));
+  if(b.error||p.error||a.error||m.error||bm.error||kd.error||ka.error||u.error||ac.error||mt.error||st.error||as.error){
+    const e=[b,p,a,m,bm,kd,ka,u,ac,mt,st,as].find(x=>x.error); throw new Error('db read failed: '+(e&&e.error?e.error.message:''));
   }
   DB.businesses=b.data; DB.providers=p.data; DB.accounts=a.data; DB.modules=m.data; DB.bizmodules=bm.data;
   DB.kpiDefs=kd.data; DB.kpiActuals=ka.data; DB.users=u.data; DB.access=ac.data; DB.metrics=mt.data; DB.steps=st.data;
+  DB.settings=as.data;
+  const gid=DB.settings.find(s=>s.key==='google_client_id');
+  CONFIG.googleClientId=(gid&&gid.value)||CONFIG.googleClientId;
 }
 
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
@@ -175,7 +179,7 @@ function renderS2(){
   const el=document.getElementById('sidebar2'); const s=SECTIONS[view];
   if(view==='settings'){
     el.innerHTML=`<div class="s2title">Settings</div>
-      ${[['providers','Provider Registry'],['users','Users & Access'],['modules','Modules Catalog']].map(([id,label])=>
+      ${[['platform','Platform'],['providers','Provider Registry'],['users','Users & Access'],['modules','Modules Catalog']].map(([id,label])=>
         `<div class="s2link ${sub===id?'active':''}" onclick="sub='${id}';render()">${label}</div>`).join('')}`;
     return;
   }
@@ -199,6 +203,7 @@ function render(){
   renderS2();
   const el=document.getElementById('main');
   if(view==='settings'){
+    if(sub==='platform')return renderPlatform(el);
     if(sub==='providers')return renderProviders(el);
     if(sub==='users')return renderUsers(el);
     if(sub==='modules')return renderModules(el);
@@ -396,12 +401,8 @@ async function persistGoogleMetrics(bizId,provName,ref,name,metrics){
 }
 async function connectGoogle(bizId,kind){
   if(!CONFIG.googleClientId){
-    modal(`<h3>One-time Google setup needed</h3>
-    <div class="hint">To let the app connect to Google directly, create an OAuth Client ID (2 minutes, free):<br><br>
-    1. Open <b>console.cloud.google.com</b> → APIs &amp; Services → enable <b>Google Analytics Data API</b> and <b>Search Console API</b><br>
-    2. Credentials → <b>Create OAuth client ID</b> → type <b>Web application</b><br>
-    3. Add Authorized JavaScript origin: <b>${esc(location.origin)}</b><br>
-    4. Copy the Client ID (ends in .apps.googleusercontent.com) and send it to Juno</div>
+    modal(`<h3>Google connection not configured yet</h3>
+    <div class="hint">The platform administrator needs to add the Google OAuth Client ID once under <b>Settings → Platform</b>. After that, connecting takes one click — no repeated setup for any business.</div>
     <div class="actions"><button class="btn" onclick="this.closest('.modal-bg').remove()">Got it</button></div>`);
     return;
   }
@@ -504,6 +505,32 @@ function renderModules(el){
     <div class="sub">Standard modules provisioned for every business</div>
     <div class="modules" style="margin-top:16px">${DB.modules.map(m=>`<div class="module"><div class="mn">${esc(m.name)}</div><div class="mc">${esc(m.category)}</div><div class="md">${esc(m.description)}</div></div>`).join('')}</div>`;
 }
+function renderPlatform(el){
+  const gid=(DB.settings.find(s=>s.key==='google_client_id')||{}).value||'';
+  el.innerHTML=`
+    <h1>Platform Settings</h1>
+    <div class="sub">One-time configuration for the whole platform — set here, inherited by every business</div>
+    <div class="card" style="max-width:720px;margin-top:18px;padding:20px 22px">
+      <div style="font-weight:700;margin-bottom:4px">Google OAuth Client ID</div>
+      <div class="hint" style="margin-bottom:12px">Enables "Connect with Google" for Google Analytics 4 and Search Console. Clients connect their own Google accounts from each business's Integrations tab — they never see this screen's technical setup.<br><br>
+      <b>Admin setup (once):</b> console.cloud.google.com → APIs &amp; Services → enable <b>Google Analytics Data API</b> and <b>Search Console API</b> → Credentials → Create OAuth client ID → type <b>Web application</b> → add Authorized JavaScript origin <b>${esc(location.origin)}</b>. Paste the client ID below. Client IDs are public by design — no secret is stored.</div>
+      <div class="field"><label>Client ID (ends in .apps.googleusercontent.com)</label><input id="ps-gid" value="${esc(gid)}" placeholder="xxxxxxxx.apps.googleusercontent.com"></div>
+      <div class="actions" style="justify-content:flex-start"><button class="btn" onclick="saveGoogleClientId()">Save</button>
+      <span style="align-self:center;font-size:12.5px;color:${gid?'var(--green)':'var(--muted)'}">${gid?'✅ Google connect is LIVE':'⏳ Not configured yet'}</span></div>
+    </div>
+    <div class="card" style="max-width:720px;margin-top:14px;padding:20px 22px">
+      <div style="font-weight:700;margin-bottom:4px">What clients see</div>
+      <div class="hint">Clients open their business → Integrations tab → "+ Connect account" on Google Analytics 4 or Google Search Console → a Google sign-in popup opens → they pick their property/site → live 28-day metrics flow into their dashboard automatically, and the setup checklist ticks itself. No accounts, no emails, no third party visible — everything happens inside this platform.</div>
+    </div>`;
+}
+async function saveGoogleClientId(){
+  const v=document.getElementById('ps-gid').value.trim();
+  const {error}=await sb.from('app_settings').upsert({key:'google_client_id',value:v,updated_at:new Date().toISOString()});
+  if(error)return toast('Save failed: '+error.message);
+  CONFIG.googleClientId=v;
+  toast(v?'✅ Saved — Google connect is live platform-wide':'Saved — Google connect disabled');
+  render();
+}
 
 /* ---------- MODALS & WRITES ---------- */
 function modal(html){document.body.insertAdjacentHTML('beforeend',`<div class="modal-bg" onclick="if(event.target===this)this.remove()"><div class="modal">${html}</div></div>`);}
@@ -525,6 +552,14 @@ async function submitBusiness(){
   if(error)return toast('Provisioning failed: '+error.message);
   await sb.from('business_modules').insert(DB.modules.map(m=>({name:m.name,business_id:data.id,module_id:m.id,enabled:true,config:'{}'})));
   if(DB.users[0])await sb.from('user_business_access').insert({name:'Owner access',user_id:DB.users[0].id,business_id:data.id,role:'owner',granted_at:new Date().toISOString()});
+  await sb.from('onboarding_steps').insert([
+    {name:'Setup step',business_id:data.id,label:'Connect Google Analytics (traffic metrics)',done:false,position:0},
+    {name:'Setup step',business_id:data.id,label:'Connect Google Search Console (search metrics)',done:false,position:1},
+    {name:'Setup step',business_id:data.id,label:'Connect CRM (leads & pipeline)',done:false,position:2},
+    {name:'Setup step',business_id:data.id,label:'Connect Email platform (outreach)',done:false,position:3},
+    {name:'Setup step',business_id:data.id,label:'Connect Payments / Accounting (revenue)',done:false,position:4},
+    {name:'Setup step',business_id:data.id,label:'Verify or add business domain',done:false,position:5},
+    {name:'Setup step',business_id:data.id,label:'Define first KPIs',done:false,position:6}]);
   toast(`✅ ${name} provisioned — workspace, ID ${data.id}, modules and integrations hub created`);
   document.querySelector('.modal-bg').remove();await loadAll();render();
 }
