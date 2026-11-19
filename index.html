@@ -92,6 +92,15 @@
   .hint{font-size:12px;color:var(--muted);background:#FDF3E0;border:1px solid #F3E3C3;padding:9px 13px;border-radius:9px;margin-bottom:16px;line-height:1.5}
   .liveflag{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
   .intgrow{display:flex;justify-content:space-between;align-items:center;gap:8px;background:#FAFBFD;border:1px solid var(--line);border-radius:8px;padding:7px 10px;margin-bottom:6px;font-size:12.5px}
+  .chk{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 13px;margin-bottom:7px;font-size:13.5px;cursor:pointer}
+  .chk:hover{border-color:var(--gold)}
+  .chk .box{width:18px;height:18px;border-radius:5px;border:2px solid #C7D0E2;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff}
+  .chk.done{opacity:.62}
+  .chk.done .box{background:var(--green);border-color:var(--green)}
+  .chk .grow{flex:1}
+  .chk .meta{font-size:11.5px;color:var(--muted)}
+  .prog{height:7px;background:#EEF1F6;border-radius:6px;overflow:hidden;margin:8px 0 16px}
+  .prog .fill{height:100%;background:var(--gold);border-radius:6px;transition:.3s}
 </style>
 </head>
 <body>
@@ -115,11 +124,11 @@
 <script src="config.js"></script>
 <script>
 const sb = window.supabase.createClient(CONFIG.supabaseUrl, CONFIG.supabaseAnonKey);
-let DB = {businesses:[],providers:[],accounts:[],modules:[],bizmodules:[],kpiDefs:[],kpiActuals:[],users:[],access:[]};
+let DB = {businesses:[],providers:[],accounts:[],modules:[],bizmodules:[],kpiDefs:[],kpiActuals:[],users:[],access:[],metrics:[],steps:[]};
 let view='business', sub='all', tab='overview';
 
 async function loadAll(){
-  const [b,p,a,m,bm,kd,ka,u,ac] = await Promise.all([
+  const [b,p,a,m,bm,kd,ka,u,ac,mt,st] = await Promise.all([
     sb.from('businesses').select('*').order('id'),
     sb.from('integration_providers').select('*').order('id'),
     sb.from('external_accounts').select('*').order('id'),
@@ -128,13 +137,15 @@ async function loadAll(){
     sb.from('kpi_definitions').select('*').order('id'),
     sb.from('kpi_actuals').select('*').order('id'),
     sb.from('users').select('*').order('id'),
-    sb.from('user_business_access').select('*').order('id')
+    sb.from('user_business_access').select('*').order('id'),
+    sb.from('provider_metrics').select('*').order('id'),
+    sb.from('onboarding_steps').select('*').order('id')
   ]);
-  if(b.error||p.error||a.error||m.error||bm.error||kd.error||ka.error||u.error||ac.error){
-    const e=[b,p,a,m,bm,kd,ka,u,ac].find(x=>x.error); throw new Error('db read failed: '+(e&&e.error?e.error.message:''));
+  if(b.error||p.error||a.error||m.error||bm.error||kd.error||ka.error||u.error||ac.error||mt.error||st.error){
+    const e=[b,p,a,m,bm,kd,ka,u,ac,mt,st].find(x=>x.error); throw new Error('db read failed: '+(e&&e.error?e.error.message:''));
   }
   DB.businesses=b.data; DB.providers=p.data; DB.accounts=a.data; DB.modules=m.data; DB.bizmodules=bm.data;
-  DB.kpiDefs=kd.data; DB.kpiActuals=ka.data; DB.users=u.data; DB.access=ac.data;
+  DB.kpiDefs=kd.data; DB.kpiActuals=ka.data; DB.users=u.data; DB.access=ac.data; DB.metrics=mt.data; DB.steps=st.data;
 }
 
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
@@ -257,12 +268,18 @@ function bizOverview(b,accounts,kpis){
       <div class="stat"><div class="n">${DB.modules.length}</div><div class="l">Modules enabled</div></div>
       <div class="stat"><div class="n">${latest.length?latest[latest.length-1]:'—'}</div><div class="l">Latest KPI actual</div></div>
     </div>
+    ${checklistHtml(b)}
+    <div style="height:14px"></div>
     <div class="hint">All metrics for ${esc(b.name)} live here: KPIs with targets vs actuals, connected integrations, and configuration. Providers are configurable and replaceable — nothing is hardcoded.</div>
     ${kpis.length?`<div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:9px">Metrics</div>
     <div class="kpis">${kpiCards(kpis,false)}</div>`:`<div class="empty">No KPIs defined yet for this business. Define the first one to start tracking metrics.</div>`}
     <div style="height:18px"></div>
     <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:9px">Integrations</div>
-    ${accounts.filter(a=>a.status==='connected').map(a=>`<div class="intgrow"><span><span class="syncdot" style="background:var(--green)"></span>${esc(a.display_name||'account')} <span class="s2sub">· ${esc(provName(a.provider_id))}</span></span><span>${badge(a.status)}</span></div>`).join('')||'<div class="empty">No integrations connected yet.</div>'}`;
+    ${accounts.filter(a=>a.status==='connected').map(a=>{
+      const mt=DB.metrics.filter(x=>String(relId(x.account_id))===String(a.id));
+      return `<div class="intgrow"><span><span class="syncdot" style="background:var(--green)"></span>${esc(a.display_name||'account')} <span class="s2sub">· ${esc(provName(a.provider_id))}</span></span><span>${badge(a.status)}</span></div>`+
+      (mt.length?`<div style="display:flex;gap:10px;flex-wrap:wrap;margin:-2px 0 10px">${mt.map(x=>`<span style="background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-size:12px"><b>${esc(x.metric)}</b> ${esc(x.value)} <span class="s2sub">· 28d</span></span>`).join('')}</div>`:'');
+    }).join('')||'<div class="empty">No integrations connected yet.</div>'}`;
 }
 function provName(id){const p=DB.providers.find(x=>String(x.id)===String(relId(id)));return p?p.name:'provider';}
 
@@ -317,6 +334,122 @@ function bizSettings(b){
     <tr><td style="color:var(--muted)">Provisioned</td><td>${esc(b.created_at||'—')}</td></tr>
     <tr><td style="color:var(--muted)">Configuration notes</td><td style="font-size:12.5px">${esc(b.notes||'—')}</td></tr>
   </tbody></table>`;
+}
+
+/* ---------- LIVE GOOGLE INTEGRATIONS (OAuth from the app) ---------- */
+let gToken=null, gTokenExp=0, gTokenClient=null;
+function gScopes(){return 'https://www.googleapis.com/auth/analytics.readonly https://www.googleapis.com/auth/webmasters.readonly';}
+async function ensureGsiLoaded(){
+  if(window.google&&window.google.accounts&&window.google.accounts.oauth2)return;
+  await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.onload=res;s.onerror=rej;document.head.appendChild(s);});
+}
+async function gAuthToken(interactive){
+  if(gToken&&Date.now()<gTokenExp-60000)return gToken;
+  if(!CONFIG.googleClientId)throw new Error('NO_CLIENT_ID');
+  await ensureGsiLoaded();
+  return new Promise((res,rej)=>{
+    gTokenClient=google.accounts.oauth2.initTokenClient({client_id:CONFIG.googleClientId,scope:gScopes(),
+      callback:t=>{if(t.error)return rej(new Error(t.error));gToken=t.access_token;gTokenExp=Date.now()+(t.expires_in||3600)*1000;res(gToken);},
+      error_callback:e=>rej(new Error(e.type||'popup_closed'))});
+    gTokenClient.requestAccessToken(interactive===false?{prompt:''}:{prompt:''});
+  });
+}
+async function gFetch(url,opts){
+  const t=await gAuthToken(false);
+  const r=await fetch(url,Object.assign({},opts,{headers:Object.assign({Authorization:'Bearer '+t,'Content-Type':'application/json'},(opts&&opts.headers)||{})}));
+  if(!r.ok)throw new Error('Google API '+r.status); return r.json();
+}
+async function ga4ListProperties(){
+  const data=await gFetch('https://analyticsadmin.googleapis.com/v1beta/accountSummaries');
+  const out=[];(data.accountSummaries||[]).forEach(a=>(a.propertySummaries||[]).forEach(p=>out.push({id:p.property,display:p.displayName})));
+  return out;
+}
+async function ga4FetchMetrics(propId){
+  const data=await gFetch('https://analyticsdata.googleapis.com/v1beta/'+propId+':runReport',{method:'POST',body:JSON.stringify({dateRanges:[{startDate:'28daysAgo',endDate:'today'}],metrics:[{name:'sessions'},{name:'activeUsers'},{name:'screenPageViews'}]})});
+  const row=(data.rows&&data.rows[0])||null;
+  return {sessions:row?Number(row.metricValues[0].value):0,users:row?Number(row.metricValues[1].value):0,pageviews:row?Number(row.metricValues[2].value):0};
+}
+async function gscListSites(){
+  const data=await gFetch('https://www.googleapis.com/webmasters/v3/sites');
+  return (data.siteEntry||[]).filter(s=>s.permissionLevel!=='siteUnverifiedUser').map(s=>({url:s.siteUrl,level:s.permissionLevel}));
+}
+async function gscFetchMetrics(siteUrl){
+  const data=await gFetch('https://www.googleapis.com/webmasters/v3/sites/'+encodeURIComponent(siteUrl)+'/searchAnalytics/query',{method:'POST',body:JSON.stringify({startDate:new Date(Date.now()-28*864e5).toISOString().slice(0,10),endDate:new Date().toISOString().slice(0,10),dimensions:[]})});
+  const row=(data.rows&&data.rows[0])||null;
+  return {clicks:row?row.clicks:0,impressions:row?row.impressions:0,ctr:row?Math.round((row.ctr||0)*1000)/10:0};
+}
+async function persistGoogleMetrics(bizId,provName,ref,name,metrics){
+  const prov=DB.providers.find(p=>p.name===provName);
+  let acc=DB.accounts.find(a=>String(relId(a.business_id))===String(bizId)&&String(relId(a.provider_id))===String(prov.id)&&a.status==='connected');
+  if(!acc){
+    const ins=await sb.from('external_accounts').insert({business_id:bizId,provider_id:prov.id,display_name:name,external_account_ref:ref,data_selection:'last 28 days auto-sync',status:'connected',connected_at:new Date().toISOString()}).select().single();
+    if(ins.error)return toast('Failed: '+ins.error.message); acc=ins.data;
+    await sb.from('integration_sync_log').insert({account_id:acc.id,name:'Google OAuth connect',status:'success',started_at:new Date().toISOString(),finished_at:new Date().toISOString()});
+  }else{
+    await sb.from('external_accounts').update({external_account_ref:ref,display_name:name}).eq('id',acc.id);
+  }
+  const rows=Object.entries(metrics).map(([k,v])=>({name:provName+' metric',account_id:acc.id,business_id:bizId,metric:k,value:v,start_date:'28daysAgo',end_date:'today',fetched_at:new Date().toISOString()}));
+  await sb.from('provider_metrics').insert(rows);
+  await sb.from('onboarding_steps').update({done:true,completed_at:new Date().toISOString()})
+    .eq('business_id',bizId).ilike('label',provName.includes('Analytics')?'Connect Google Analytics%':'Connect Google Search Console%');
+  return acc;
+}
+async function connectGoogle(bizId,kind){
+  if(!CONFIG.googleClientId){
+    modal(`<h3>One-time Google setup needed</h3>
+    <div class="hint">To let the app connect to Google directly, create an OAuth Client ID (2 minutes, free):<br><br>
+    1. Open <b>console.cloud.google.com</b> → APIs &amp; Services → enable <b>Google Analytics Data API</b> and <b>Search Console API</b><br>
+    2. Credentials → <b>Create OAuth client ID</b> → type <b>Web application</b><br>
+    3. Add Authorized JavaScript origin: <b>${esc(location.origin)}</b><br>
+    4. Copy the Client ID (ends in .apps.googleusercontent.com) and send it to Juno</div>
+    <div class="actions"><button class="btn" onclick="this.closest('.modal-bg').remove()">Got it</button></div>`);
+    return;
+  }
+  try{
+    toast('Opening Google sign-in…');
+    await gAuthToken(true);
+    if(kind==='ga4'){
+      const props=await ga4ListProperties();
+      if(!props.length)return toast('No GA4 properties visible for this Google account');
+      pickModal('Choose a GA4 property',props.map(p=>({v:p.id,l:p.displayName||p.display+' ('+p.id+')'})),async id=>{
+        const m=await ga4FetchMetrics(id);
+        const meta=props.find(x=>x.v===id); const label=meta?meta.display||meta.displayName:'GA4 property';
+        await persistGoogleMetrics(bizId,'Google Analytics 4',id,label,m);
+        toast('✅ '+label+' connected — '+m.sessions+' sessions in last 28 days');
+        document.querySelector('.modal-bg').remove();await loadAll();render();
+      });
+    }else{
+      const sites=await gscListSites();
+      if(!sites.length)return toast('No verified Search Console properties for this Google account');
+      pickModal('Choose a Search Console property',sites.map(s=>({v:s.url,l:s.url})),async url=>{
+        const m=await gscFetchMetrics(url);
+        await persistGoogleMetrics(bizId,'Google Search Console',url,url,m);
+        toast('✅ Search Console connected — '+m.clicks+' clicks in last 28 days');
+        document.querySelector('.modal-bg').remove();await loadAll();render();
+      });
+    }
+  }catch(e){toast('Google connect failed: '+e.message);}
+}
+function pickModal(title,opts,cb){
+  window.__pickCb=cb;
+  modal(`<h3>${esc(title)}</h3>`+opts.map(o=>`<div class="chk" onclick="window.__pickCb('${esc(o.v)}')"><div class="box">▸</div><div class="grow">${esc(o.l)}</div></div>`).join('')+
+  `<div class="actions"><button class="btn ghost" onclick="this.closest('.modal-bg').remove()">Cancel</button></div>`);
+}
+
+/* ---------- ONBOARDING CHECKLIST ---------- */
+function checklistHtml(biz){
+  const steps=DB.steps.filter(s=>String(relId(s.business_id))===String(biz.id)).sort((a,b)=>(a.position||0)-(b.position||0));
+  if(!steps.length)return '';
+  const done=steps.filter(s=>s.done).length;
+  const pct=Math.round(done/steps.length*100);
+  return `<div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:4px 0 0">Setup checklist — ${done}/${steps.length} complete</div>
+  <div class="prog"><div class="fill" style="width:${pct}%"></div></div>
+  ${steps.map(s=>`<div class="chk ${s.done?'done':''}" onclick="toggleStep(${s.id},${s.done?'false':'true'})">
+    <div class="box">${s.done?'✓':''}</div><div class="grow">${esc(s.label)}</div>${s.done?'<div class="meta">done</div>':''}</div>`).join('')}`;
+}
+async function toggleStep(id,done){
+  await sb.from('onboarding_steps').update({done,completed_at:done?new Date().toISOString():null}).eq('id',id);
+  await loadAll();render();
 }
 
 /* ---------- SALES / MARKETING / FINANCE sections ---------- */
@@ -396,6 +529,8 @@ async function submitBusiness(){
   document.querySelector('.modal-bg').remove();await loadAll();render();
 }
 function showConnect(bizId,provId,provName){
+  if(provName==='Google Analytics 4')return connectGoogle(bizId,'ga4');
+  if(provName==='Google Search Console')return connectGoogle(bizId,'gsc');
   modal(`<h3>Connect ${esc(provName)}</h3>
   <div class="field"><label>Account display name</label><input id="cn-name" placeholder="e.g. Production account"></div>
   <div class="field"><label>External account reference</label><input id="cn-ref" placeholder="provider account / org ID"></div>
