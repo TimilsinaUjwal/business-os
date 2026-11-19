@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Business OS</title>
+<style>
+  :root{ --navy:#16294A; --navy-2:#1F3A66; --gold:#E0A44A; --bg:#F5F6F9; --card:#FFFFFF; --ink:#1B2436; --muted:#6B7688; --line:#E4E8F0; --green:#1F9D55; --red:#D64545; --amber:#C98A1B; --radius:14px; }
+  *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',system-ui,-apple-system,sans-serif}
+  body{background:var(--bg);color:var(--ink);min-height:100vh}
+  .app{display:flex;min-height:100vh}
+  .sidebar{width:230px;background:var(--navy);color:#fff;padding:22px 16px;display:flex;flex-direction:column;gap:6px;flex-shrink:0}
+  .logo{font-size:19px;font-weight:700;letter-spacing:.3px;margin-bottom:22px;display:flex;align-items:center;gap:10px}
+  .logo .dot{width:10px;height:10px;border-radius:50%;background:var(--gold)}
+  .navlink{padding:10px 12px;border-radius:9px;cursor:pointer;color:#C7D0E2;font-size:14px;display:flex;gap:10px;align-items:center}
+  .navlink:hover{background:var(--navy-2);color:#fff}
+  .navlink.active{background:var(--navy-2);color:#fff;box-shadow:inset 3px 0 0 var(--gold)}
+  .sidebar .spacer{flex:1}
+  .sidebar .foot{font-size:11px;color:#7E8DAB;line-height:1.5;padding:10px 12px;border-top:1px solid #2A3E63}
+  .main{flex:1;padding:28px 32px;max-width:1200px}
+  h1{font-size:24px;font-weight:700}
+  .sub{color:var(--muted);font-size:13.5px;margin-top:5px}
+  .stats{display:flex;gap:14px;margin:22px 0;flex-wrap:wrap}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px 20px;flex:1;min-width:130px}
+  .stat .n{font-size:26px;font-weight:700}
+  .stat .l{font-size:12px;color:var(--muted);margin-top:3px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px;cursor:pointer;transition:.15s;position:relative}
+  .card:hover{border-color:var(--gold);box-shadow:0 4px 14px rgba(22,41,74,.08);transform:translateY(-2px)}
+  .card h3{font-size:15.5px;margin-bottom:5px}
+  .card .ind{font-size:12.5px;color:var(--muted)}
+  .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;margin-top:8px}
+  .badge.active{background:#E4F5EC;color:var(--green)}
+  .badge.free{background:#E4F5EC;color:var(--green)}
+  .badge.free_tier{background:#FDF3E0;color:var(--amber)}
+  .badge.paid{background:#FBE7E7;color:var(--red)}
+  .badge.usage_fees{background:#FDF3E0;color:var(--amber)}
+  .badge.connected{background:#E4F5EC;color:var(--green)}
+  .badge.disconnected{background:#EEF1F6;color:var(--muted)}
+  .badge.error{background:#FBE7E7;color:var(--red)}
+  .badge.pending{background:#FDF3E0;color:var(--amber)}
+  .card .cat{position:absolute;top:18px;right:18px;font-size:11px}
+  .addcard{border:2px dashed #C7D0E2;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--muted);min-height:120px}
+  .addcard:hover{border-color:var(--gold);color:var(--ink)}
+  .addcard .plus{font-size:26px;color:var(--gold)}
+  button{cursor:pointer;font-family:inherit}
+  .btn{background:var(--gold);border:none;color:#fff;font-weight:600;padding:10px 18px;border-radius:9px;font-size:13.5px}
+  .btn:hover{filter:brightness(1.07)}
+  .btn.ghost{background:#fff;color:var(--ink);border:1px solid var(--line)}
+  .btn.small{padding:6px 12px;font-size:12px;border-radius:7px}
+  .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:12px;flex-wrap:wrap}
+  .crumb{font-size:12.5px;color:var(--muted);margin-bottom:4px;cursor:pointer}
+  .crumb:hover{color:var(--gold)}
+  .tabs{display:flex;gap:6px;margin:18px 0 20px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .tab{padding:10px 16px;font-size:13.5px;color:var(--muted);cursor:pointer;border-bottom:2.5px solid transparent;margin-bottom:-1px}
+  .tab.active{color:var(--ink);font-weight:600;border-color:var(--gold)}
+  .modules{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+  .module{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:15px}
+  .module .mn{font-weight:600;font-size:14px}
+  .module .mc{font-size:11px;color:var(--gold);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
+  .module .md{font-size:12px;color:var(--muted);margin-top:5px;line-height:1.45}
+  table{width:100%;border-collapse:collapse;background:var(--card);border-radius:var(--radius);overflow:hidden;border:1px solid var(--line)}
+  th{background:#FAFBFD;text-align:left;font-size:11.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);padding:11px 14px}
+  td{padding:12px 14px;border-top:1px solid var(--line);font-size:13.5px;vertical-align:middle}
+  .costline{font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.45}
+  .modal-bg{position:fixed;inset:0;background:rgba(15,25,45,.55);display:flex;align-items:center;justify-content:center;z-index:50}
+  .modal{background:#fff;border-radius:16px;padding:26px;width:420px;max-width:92vw;max-height:88vh;overflow:auto}
+  .modal h3{margin-bottom:16px;font-size:17px}
+  .field{margin-bottom:13px}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px;font-weight:600}
+  .field input,.field select,.field textarea{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;font-family:inherit}
+  .field textarea{min-height:60px;resize:vertical}
+  .modal .actions{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
+  .toast{position:fixed;bottom:24px;right:24px;background:var(--navy);color:#fff;padding:13px 20px;border-radius:10px;font-size:13.5px;box-shadow:0 6px 20px rgba(0,0,0,.25);z-index:99;opacity:0;transform:translateY(10px);transition:.25s}
+  .toast.show{opacity:1;transform:none}
+  .empty{background:var(--card);border:1px dashed var(--line);border-radius:var(--radius);padding:34px;text-align:center;color:var(--muted);font-size:13.5px}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px}
+  .kpi .kn{font-size:13px;font-weight:600}
+  .kpi .kt{font-size:11.5px;color:var(--muted);margin-top:3px}
+  .kpi .kv{font-size:22px;font-weight:700;margin-top:8px}
+  .kpi .kv small{font-size:12px;font-weight:500;color:var(--muted)}
+  .syncdot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+  .hint{font-size:12px;color:var(--muted);background:#FDF3E0;border:1px solid #F3E3C3;padding:9px 13px;border-radius:9px;margin-bottom:16px;line-height:1.5}
+  .liveflag{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="logo"><span class="dot"></span>Business OS</div>
+    <div class="navlink active" data-view="portfolio">▦ Portfolio</div>
+    <div class="navlink" data-view="providers">⬡ Provider Registry</div>
+    <div class="spacer"></div>
+    <div style="padding:0 12px 8px"><span class="liveflag" id="liveflag">● loading…</span></div>
+    <div class="foot">Integration-agnostic · Free-first<br>No hardcoded business limit</div>
+  </aside>
+  <main class="main" id="main"><div style="padding:60px;color:var(--muted)">Loading Business OS…</div></main>
+</div>
+<div class="toast" id="toast"></div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>
+const sb = window.supabase.createClient(CONFIG.supabaseUrl, CONFIG.supabaseAnonKey);
+const TABLES = ['businesses','integration_providers','external_accounts','module_catalog','business_modules','kpi_definitions','kpi_actuals'];
+let DB = {businesses:[],providers:[],accounts:[],modules:[],bizmodules:[],kpiDefs:[],kpiActuals:[]};
+let view='portfolio', currentBiz=null, currentTab='overview';
+
+async function loadAll(){
+  const [b,p,a,m,bm,kd,ka] = await Promise.all([
+    sb.from('businesses').select('*').order('id'),
+    sb.from('integration_providers').select('*').order('id'),
+    sb.from('external_accounts').select('*').order('id'),
+    sb.from('module_catalog').select('*').order('id'),
+    sb.from('business_modules').select('*').order('id'),
+    sb.from('kpi_definitions').select('*').order('id'),
+    sb.from('kpi_actuals').select('*').order('id')
+  ]);
+  if(b.error||p.error||a.error||m.error||bm.error||kd.error||ka.error) throw new Error('db read failed');
+  DB.businesses=b.data; DB.providers=p.data; DB.accounts=a.data;
+  DB.modules=m.data; DB.bizmodules=bm.data; DB.kpiDefs=kd.data; DB.kpiActuals=ka.data;
+}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function badge(s){return `<span class="badge ${esc(s)}">${esc(s)}</span>`;}
+function costBadge(cm){return `<span class="badge ${esc(cm)}">${cm==='free'?'Free':cm==='free_tier'?'Free tier':cm==='paid'?'Paid':'Usage fees'}</span>`;}
+function relId(v){return v&&typeof v==='object'?(v.id??''):v;}
+
+document.querySelectorAll('.navlink').forEach(n=>n.onclick=()=>{
+  view=n.dataset.view; currentBiz=null;
+  document.querySelectorAll('.navlink').forEach(x=>x.classList.toggle('active',x===n));
+  render();
+});
+
+function openBiz(id){
+  currentBiz=DB.businesses.find(b=>String(b.id)===String(id));
+  view='business'; currentTab='overview';
+  document.querySelectorAll('.navlink').forEach(x=>x.classList.remove('active'));
+  render();
+}
+
+function render(){
+  const el=document.getElementById('main');
+  if(view==='portfolio') return renderPortfolio(el);
+  if(view==='providers') return renderProviders(el);
+  if(view==='business'&&currentBiz) return renderBusiness(el);
+}
+
+function renderPortfolio(el){
+  const act=DB.businesses.filter(b=>b.status==='active').length;
+  const conns=DB.accounts.filter(a=>a.status==='connected').length;
+  el.innerHTML=`
+    <div class="topbar"><div><h1>Portfolio</h1>
+      <div class="sub">One parent portfolio · every business provisioned identically · scales from 13 to 500+ with no code change</div></div>
+      <button class="btn" onclick="showAddBusiness()">+ Add Business</button></div>
+    <div class="stats">
+      <div class="stat"><div class="n">${DB.businesses.length}</div><div class="l">Businesses</div></div>
+      <div class="stat"><div class="n">${act}</div><div class="l">Active</div></div>
+      <div class="stat"><div class="n">${DB.modules.length}</div><div class="l">Standard modules</div></div>
+      <div class="stat"><div class="n">${conns}</div><div class="l">Connected integrations</div></div>
+      <div class="stat"><div class="n">${DB.providers.length}</div><div class="l">Providers in registry</div></div>
+    </div>
+    <div class="grid">
+      ${DB.businesses.map(b=>{
+        const n=DB.accounts.filter(a=>String(relId(a.business_id))===String(b.id)&&a.status==='connected').length;
+        return `<div class="card" onclick="openBiz(${b.id})">
+          <h3>${esc(b.name)}</h3><div class="ind">${esc(b.industry||'—')}</div>
+          <div style="margin-top:12px;font-size:12px;color:var(--muted)">Business ID ${b.id} · ${n} connected integration${n===1?'':'s'}</div>
+          ${badge(b.status)}</div>`;}).join('')}
+      <div class="card addcard" onclick="showAddBusiness()"><div class="plus">+</div><div>Add a new business — auto-provisioned</div></div>
+    </div>`;
+}
+
+function renderProviders(el){
+  el.innerHTML=`
+    <h1>Provider Registry</h1>
+    <div class="sub">Free-first policy · paid tools optional, never mandatory · any provider can be added or replaced without redesign</div>
+    <div class="hint">Cost disclosure for every provider: free or paid, free-tier limits, API access requirements, and whether a subscription is required.</div>
+    <table><thead><tr><th>Provider</th><th>Category</th><th>Auth</th><th>Cost</th><th>API requirements</th><th>Status</th></tr></thead><tbody>
+    ${DB.providers.map(p=>`<tr>
+      <td><b>${esc(p.name)}</b><div class="costline">${esc(p.cost_notes||'')}</div></td>
+      <td>${esc(p.category)}</td><td>${esc(p.auth_type)}</td>
+      <td>${costBadge(p.cost_model)}<div class="costline">${esc(p.free_tier_limits||'')}</div></td>
+      <td style="font-size:12.5px">${esc(p.api_requirements||'—')}</td>
+      <td>${badge(p.status)}</td></tr>`).join('')}
+    </tbody></table>`;
+}
+
+function renderBusiness(el){
+  const b=currentBiz, bizId=b.id;
+  const bizAccounts=DB.accounts.filter(a=>String(relId(a.business_id))===String(bizId));
+  const bizKpis=DB.kpiDefs.filter(k=>String(relId(k.business_id))===String(bizId));
+  const enabledMods=DB.bizmodules.filter(x=>String(relId(x.business_id))===String(bizId)&&x.enabled)
+    .map(x=>DB.modules.find(m=>String(m.id)===String(relId(x.module_id)))).filter(Boolean);
+  const side=[...new Set((enabledMods.length?enabledMods:DB.modules).map(m=>m.name))];
+  el.innerHTML=`
+    <div class="crumb" onclick="view='portfolio';document.querySelector('[data-view=portfolio]').classList.add('active');render()">← Portfolio</div>
+    <div class="topbar"><div><h1>${esc(b.name)}</h1>
+      <div class="sub">${esc(b.industry||'')} · Business ID ${bizId} · ${esc(b.slug||'')}</div></div>
+      ${badge(b.status)}</div>
+    <div class="tabs">
+      ${['overview','integrations','kpis','settings'].map(t=>`<div class="tab ${currentTab===t?'active':''}" onclick="currentTab='${t}';render()">${t[0].toUpperCase()+t.slice(1)}</div>`).join('')}
+    </div><div style="display:flex;gap:26px;align-items:flex-start">
+      <div style="width:170px;flex-shrink:0">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:9px">Standard modules</div>
+        ${side.map(m=>`<div style="padding:8px 10px;border-radius:8px;font-size:13px;background:#fff;border:1px solid var(--line);margin-bottom:6px">${esc(m)}</div>`).join('')}
+      </div>
+      <div style="flex:1;min-width:0">${currentTab==='overview'?tabOverview(b,bizAccounts):currentTab==='integrations'?tabIntegrations(b,bizAccounts):currentTab==='kpis'?tabKpis(b,bizKpis):tabSettings(b)}</div>
+    </div>`;
+}
+
+function tabOverview(b,accounts){
+  const conns=accounts.filter(a=>a.status==='connected').length;
+  const kcount=DB.kpiDefs.filter(k=>String(relId(k.business_id))===String(b.id)).length;
+  return `<div class="stats" style="margin-top:0">
+      <div class="stat"><div class="n">${conns}</div><div class="l">Connected integrations</div></div>
+      <div class="stat"><div class="n">${kcount}</div><div class="l">KPIs tracked</div></div>
+      <div class="stat"><div class="n">${DB.modules.length}</div><div class="l">Modules enabled</div></div>
+    </div>
+    <div class="hint">This workspace is provisioned identically to every other business: unique ID, standard sidebar and modules, independent KPIs, and its own external integrations. Nothing here assumes Zoho, LeadOcean, Resend or Stripe — providers are configurable and replaceable.</div>
+    <div class="modules">${DB.modules.map(m=>`<div class="module"><div class="mn">${esc(m.name)}</div><div class="mc">${esc(m.category)}</div><div class="md">${esc(m.description)}</div></div>`).join('')}</div>`;
+}
+
+function tabIntegrations(b,accounts){
+  const cats=[...new Set(DB.providers.map(p=>p.category))];
+  return `<div class="hint">Every business connects its own CRM, email platform, accounting system or other provider. Multiple accounts per provider are supported, and disconnecting one integration never affects the others.</div>
+    ${cats.map(c=>{
+      const provs=DB.providers.filter(p=>p.category===c);
+      return `<div style="margin-bottom:22px"><div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:9px">${esc(c)}</div>
+      <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(250px,1fr))">
+      ${provs.map(p=>{
+        const linked=accounts.filter(a=>String(relId(a.provider_id))===String(p.id));
+        return `<div class="card" style="cursor:default">
+          <h3>${esc(p.name)} <span class="cat">${costBadge(p.cost_model)}</span></h3>
+          <div class="costline">${esc(p.free_tier_limits||p.cost_notes||'')}</div>
+          <div style="margin-top:10px">${linked.map(a=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;background:#FAFBFD;border:1px solid var(--line);border-radius:8px;padding:7px 10px;margin-bottom:6px;font-size:12.5px">
+            <span><span class="syncdot" style="background:${a.status==='connected'?'var(--green)':a.status==='error'?'var(--red)':'var(--amber)'}"></span>${esc(a.display_name||a.external_account_ref||'account')}</span>
+            <span>${badge(a.status)} <button class="btn ghost small" onclick="toggleAccount(${a.id},'${a.status==='connected'?'disconnected':'connected'}')">Disconnect</button></span></div>`).join('')||
+            '<div style="font-size:12px;color:var(--muted);margin:6px 0">Not connected</div>'}
+          </div>
+          <button class="btn small" onclick="showConnect(${b.id},${p.id},'${esc(p.name)}')">+ Connect account</button>
+        </div>`;}).join('')}
+      </div></div>`;}).join('')}`;
+}
+
+function tabKpis(b,kpis){
+  return `<div class="topbar"><div class="sub">Business-specific KPIs — independent targets per business</div>
+    <button class="btn" onclick="showAddKpi(${b.id})">+ Define KPI</button></div>
+    ${kpis.length?`<div class="kpis" style="margin-top:14px">${kpis.map(k=>{
+      const actuals=DB.kpiActuals.filter(a=>String(relId(a.kpi_id))===String(k.id)).sort((x,y)=>String(y.period).localeCompare(String(x.period)));
+      const last=actuals[0];
+      const pct=last&&k.target_value?Math.round(last.actual_value/k.target_value*100):null;
+      return `<div class="kpi"><div class="kn">${esc(k.name)}</div><div class="kt">${esc(k.category||'')} · target ${esc(k.target_value)} per ${esc(k.period)}</div>
+        <div class="kv">${last?esc(last.actual_value):'—'} <small>latest</small> ${pct!==null?`<small>· ${pct}% of target</small>`:''}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px"><button class="btn ghost small" onclick="showLogKpi(${k.id},'${esc(k.name)}')">log actual</button></div>
+      </div>`;}).join('')}</div>`:`<div class="empty" style="margin-top:14px">No KPIs defined for this business yet. Each business carries its own targets — define the first one.</div>`}`;
+}
+
+function tabSettings(b){
+  return `<table><tbody>
+    <tr><td style="width:180px;color:var(--muted)">Business name</td><td><b>${esc(b.name)}</b></td></tr>
+    <tr><td style="color:var(--muted)">Business ID (unique)</td><td>${b.id}</td></tr>
+    <tr><td style="color:var(--muted)">Slug</td><td>${esc(b.slug||'—')}</td></tr>
+    <tr><td style="color:var(--muted)">Industry</td><td>${esc(b.industry||'—')}</td></tr>
+    <tr><td style="color:var(--muted)">Status</td><td>${badge(b.status)}</td></tr>
+    <tr><td style="color:var(--muted)">Provisioned</td><td>${esc(b.created_at||'—')}</td></tr>
+    <tr><td style="color:var(--muted)">Configuration notes</td><td style="font-size:12.5px">${esc(b.notes||'—')}</td></tr>
+  </tbody></table>`;
+}
+
+function modal(html){document.body.insertAdjacentHTML('beforeend',`<div class="modal-bg" onclick="if(event.target===this)this.remove()"><div class="modal">${html}</div></div>`);}
+function showConnect(bizId,provId,provName){
+  modal(`<h3>Connect ${esc(provName)}</h3>
+  <div class="field"><label>Account display name</label><input id="cn-name" placeholder="e.g. Production account"></div>
+  <div class="field"><label>External account reference</label><input id="cn-ref" placeholder="provider account / org ID"></div>
+  <div class="field"><label>Data to import</label><textarea id="cn-data" placeholder="e.g. contacts, deals, monthly revenue"></textarea></div>
+  <div class="actions"><button class="btn ghost" onclick="this.closest('.modal-bg').remove()">Cancel</button>
+  <button class="btn" onclick="submitConnect(${bizId},${provId})">Connect</button></div>`);
+}
+async function submitConnect(bizId,provId){
+  const payload={business_id:bizId,provider_id:provId,display_name:document.getElementById('cn-name').value.trim()||'Account',
+    external_account_ref:document.getElementById('cn-ref').value.trim(),data_selection:document.getElementById('cn-data').value.trim(),status:'connected',connected_at:new Date().toISOString()};
+  const {data,error}=await sb.from('external_accounts').insert(payload).select().single();
+  if(error)return toast('Connect failed: '+error.message);
+  await sb.from('integration_sync_log').insert({account_id:data.id,name:'Initial connection',status:'success',started_at:new Date().toISOString(),finished_at:new Date().toISOString()});
+  toast('✅ Integration connected');document.querySelector('.modal-bg').remove();await loadAll();render();
+}
+async function toggleAccount(id,status){
+  const {error}=await sb.from('external_accounts').update({status,disconnected_at:status==='disconnected'?new Date().toISOString():null}).eq('id',id);
+  if(error)return toast('Update failed: '+error.message);
+  toast(status==='disconnected'?'Integration disconnected':'Reconnected');await loadAll();render();
+}
+function showAddBusiness(){
+  modal(`<h3>Add a new business</h3><div class="hint" style="margin-bottom:14px">Auto-provisioning: unique business ID, standard sidebar and modules, independent KPIs, own integrations, and inclusion in the portfolio dashboard. No code change required.</div>
+  <div class="field"><label>Business name</label><input id="nb-name"></div>
+  <div class="field"><label>Slug</label><input id="nb-slug" placeholder="auto from name if left blank"></div>
+  <div class="field"><label>Industry</label><input id="nb-industry"></div>
+  <div class="field"><label>Notes (current external stack — illustrative)</label><textarea id="nb-notes"></textarea></div>
+  <div class="actions"><button class="btn ghost" onclick="this.closest('.modal-bg').remove()">Cancel</button>
+  <button class="btn" onclick="submitBusiness()">Provision business</button></div>`);
+}
+async function submitBusiness(){
+  const name=document.getElementById('nb-name').value.trim();
+  if(!name)return toast('Business name is required');
+  const slug=document.getElementById('nb-slug').value.trim()||name.toLowerCase().replace(/[^a-z0-9]+/g,'-');
+  const payload={name,slug,status:'active',industry:document.getElementById('nb-industry').value.trim(),created_at:new Date().toISOString(),notes:document.getElementById('nb-notes').value.trim()};
+  const {data,error}=await sb.from('businesses').insert(payload).select().single();
+  if(error)return toast('Provisioning failed: '+error.message);
+  // Auto-provision: standard modules + owner access
+  await sb.from('business_modules').insert(DB.modules.map(m=>({name:m.name,business_id:data.id,module_id:m.id,enabled:true,config:'{}'})));
+  await sb.from('user_business_access').insert({name:'Owner access',user_id:30,business_id:data.id,role:'owner',granted_at:new Date().toISOString()});
+  toast(`✅ ${name} provisioned — workspace, ID ${data.id}, modules and integrations hub created`);
+  document.querySelector('.modal-bg').remove();await loadAll();render();
+}
+function showAddKpi(bizId){
+  modal(`<h3>Define a KPI</h3>
+  <div class="field"><label>Name</label><input id="kn-name" placeholder="e.g. Monthly recurring revenue"></div>
+  <div class="field"><label>Target value</label><input id="kn-target" type="number"></div>
+  <div class="field"><label>Period</label><select id="kn-period"><option>monthly</option><option>quarterly</option><option>annual</option></select></div>
+  <div class="field"><label>Category</label><input id="kn-cat" placeholder="e.g. Finance, Growth"></div>
+  <div class="field"><label>Formula / definition</label><textarea id="kn-formula"></textarea></div>
+  <div class="actions"><button class="btn ghost" onclick="this.closest('.modal-bg').remove()">Cancel</button>
+  <button class="btn" onclick="submitKpi(${bizId})">Create KPI</button></div>`);
+}
+async function submitKpi(bizId){
+  const payload={name:document.getElementById('kn-name').value.trim()||'Untitled KPI',business_id:bizId,
+    target_value:Number(document.getElementById('kn-target').value)||0,period:document.getElementById('kn-period').value,
+    category:document.getElementById('kn-cat').value.trim(),formula:document.getElementById('kn-formula').value.trim()};
+  const {error}=await sb.from('kpi_definitions').insert(payload);
+  if(error)return toast('Failed: '+error.message);
+  toast('✅ KPI defined');document.querySelector('.modal-bg').remove();await loadAll();render();
+}
+function showLogKpi(kpiId,kpiName){
+  modal(`<h3>Log actual — ${esc(kpiName)}</h3>
+  <div class="field"><label>Value</label><input id="ka-val" type="number"></div>
+  <div class="field"><label>Period</label><input id="ka-period" placeholder="e.g. 2026-11"></div>
+  <div class="actions"><button class="btn ghost" onclick="this.closest('.modal-bg').remove()">Cancel</button>
+  <button class="btn" onclick="submitKpiActual(${kpiId})">Save</button></div>`);
+}
+async function submitKpiActual(kpiId){
+  const payload={kpi_id:kpiId,actual_value:Number(document.getElementById('ka-val').value)||0,
+    period:document.getElementById('ka-period').value.trim()||new Date().toISOString().slice(0,7),recorded_at:new Date().toISOString()};
+  const {error}=await sb.from('kpi_actuals').insert(payload);
+  if(error)return toast('Failed: '+error.message);
+  toast('✅ Actual logged');document.querySelector('.modal-bg').remove();await loadAll();render();
+}
+
+(async function init(){
+  const f=document.getElementById('liveflag');
+  try{
+    await loadAll();
+    f.style.background='#E4F5EC'; f.style.color='var(--green)'; f.textContent='● Live · Supabase';
+  }catch(e){
+    f.style.background='#FBE7E7'; f.style.color='var(--red)'; f.textContent='● Cannot reach database';
+  }
+  render();
+})();
+</script>
+</body>
+</html>
